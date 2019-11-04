@@ -22,7 +22,7 @@ def parse_args():
     )
     parser.add_argument("--batch_size", default=64, type=int)
     parser.add_argument("--num_workers", default=6, type=int)
-    parser.add_argument("--lr", default=0.00001, type=int)
+    parser.add_argument("--lr", default=0.00001, type=float)
     parser.add_argument(
         "--lrd", default=[0.5, 2, 4, 6, 8], help="learning rate schedule"
     )
@@ -154,8 +154,8 @@ def main():
     scheduler = optim.lr_scheduler.MultiStepLR(
         opti, milestones=args.lrd[1:], gamma=args.lrd[0]
     )
-    
-    for epoch in range(5):
+
+    for epoch in range(args.epochs):
         print("Train")
         train_loss = train(train_loader, model, criterium, opti, epoch)
         print("Validation")
