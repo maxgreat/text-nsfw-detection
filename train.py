@@ -23,6 +23,9 @@ def parse_args():
     parser.add_argument("--batch_size", default=64, type=int)
     parser.add_argument("--num_workers", default=6, type=int)
     parser.add_argument("--lr", default=0.00001, type=int)
+    parser.add_argument(
+        "--lrd", default=[0.5, 2, 4, 6, 8], help="learning rate schedule"
+    )
     parser.add_argument("--model", default="LSTM", help="LSTM or SUM or Bert")
     parser.add_argument("--epochs", default=10, help="Numbers of epochs")
     return parser.parse_args()
@@ -148,7 +151,10 @@ def main():
     print("Avg loss : ", loss_avg)
     print("precision : ", best_rec)
 
-    scheduler = optim.lr_scheduler.MultiStepLR(opti, milestones=[2, 3, 4], gamma=0.5)
+    scheduler = optim.lr_scheduler.MultiStepLR(
+        opti, milestones=args.lrd[1:], gamma=args.lrd[0]
+    )
+    
     for epoch in range(5):
         print("Train")
         train_loss = train(train_loader, model, criterium, opti, epoch)
