@@ -19,7 +19,7 @@ class FastTextLSTM(nn.Module):
                 batch_first=True,
             )
         self.classif = nn.Sequential(
-            nn.ReLU(inplace=True), nn.Linear(300, 2, bias=True)
+            nn.ReLU(inplace=True), nn.Linear(300, 1, bias=True)
         )
 
     def forward(self, x, lengths):
@@ -28,7 +28,7 @@ class FastTextLSTM(nn.Module):
         """
         output, _ = self.rnn(x)
         lasts = torch.stack([output[i][lengths[i] - 1] for i in range(output.size(0))])
-        return self.classif(lasts)
+        return self.classif(lasts).squeeze()
 
 
 class FastTextSum(nn.Module):
@@ -40,7 +40,22 @@ class FastTextSum(nn.Module):
         return self.classif(x)
 
 
-def BertFinetuned(nb_class=2):
-    bert_model = BertModel.from_pretrained("bert-base-uncased")
-    bert_model.pooler.Linear = nn.Linear(768, 2)
-    return bert_model
+class BertPooler(nn.Module):
+    def __init__(self, bert_model):
+        super(BertPooler, self).__init__()
+        self.model = BertModel.from_pretrained(bert_model)
+        self.model.pooler.dense = nn.Linear(768, 2)
+
+    def forward(self, x, lengths):
+        x = self.model(x)
+        return x[1]
+
+
+class BertSumer(nn.Module):
+    def __init__(self, bert_model):
+        super(BertPooler, self).__init__()
+        self.model = BertModel.from_pretrained(bert_model)
+
+    def forward(self, x, lengths):
+        x = self.model(x)
+        return torch.sum(x[0], 1)

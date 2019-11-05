@@ -12,13 +12,13 @@ def collate(data):
     captions, labels = zip(*data)
     lengths = [len(cap) for cap in captions]
     targets = pad_sequence(captions, batch_first=True)
-    return targets, lengths, torch.LongTensor(labels)
+    return targets, lengths, torch.Tensor(labels)
 
 
 def collate_simple(data):
     captions, labels = zip(*data)
     lengths = [1 for i in range(len(captions))]
-    return torch.stack(captions), lengths, torch.LongTensor(labels)
+    return torch.stack(captions), lengths, torch.Tensor(labels)
 
 
 class GenericDataset(data.Dataset):
@@ -31,8 +31,11 @@ class GenericDataset(data.Dataset):
         self.data = [tokenizer(line) for line in open(self.root)]
         self.getter = getter
 
-    def __getitem__(self, index):
-        return self.getter(self.data[index])
+    def __getitem__(self, index, raw=False):
+        if raw:
+            return self.getter(self.data), self.data[index]
+        else:
+            return self.getter(self.data[index])
 
     def __len__(self):
         return len(self.data)
@@ -46,9 +49,9 @@ class FastTextDataset(GenericDataset):
             if label == "__label__pron" or label == "__label__1":
                 label = 1
             else:
-                label = 0
+                label = -1
             self.data.append((sentence.split(" "), label))
-        fasttext_model = fastText.load_model("/data/m.portaz/wiki.en.bin")
+        fasttext_model = fastText.load_model("/data/m.portaz/cc.fr.300.bin")
         if sum:
             self.getter = lambda x: (
                 torch.sum(
@@ -64,10 +67,12 @@ class FastTextDataset(GenericDataset):
 
 
 class BertTextDataset(GenericDataset):
-    def __init__(self, file):
+    def __init__(self, file, bert_model):
         self.data = []
         for line in open(file):
             label, sentence = line.split(" ", 1)
+            if len(sentence.split(" ")) > 20:
+                continue
             if (
                 label == "__label__pron"
                 or label == "__label__1"
@@ -75,7 +80,7 @@ class BertTextDataset(GenericDataset):
             ):
                 label = 1
             else:
-                label = 0
-            self.data.append((sentence.split(" "), label))
-        berttok = BertTokenizer.from_pretrained("bert-based-uncased")
+                label = -1
+            self.data.append((sentence, label))
+        berttok = BertTokenizer.from_pretrained(bert_model)
         self.getter = lambda x: (torch.LongTensor(berttok.encode(x[0])), x[1])

@@ -12,6 +12,8 @@ import models
 from dataset import FastTextDataset, collate, BertTextDataset, collate_simple
 from tensorboardX import SummaryWriter
 
+MARGIN = 0.0
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train text classification")
@@ -27,12 +29,29 @@ def parse_args():
         "--lrd", default=[0.5, 2, 4, 6, 8], help="learning rate schedule"
     )
     parser.add_argument("--model", default="LSTM", help="LSTM or SUM or Bert")
-    parser.add_argument("--epochs", default=10, help="Numbers of epochs")
+    parser.add_argument("--bert_model", default="bert-base-cased")
+    parser.add_argument("--epochs", default=10, help="Numbers of epochs", type=int)
     return parser.parse_args()
 
 
 def eval_recall(l1, l2):
-    return (np.argmax(l1, 1) == l2).sum() / l2.size
+    score = 0
+    nb_porn = 0
+    nb_other = 0
+    avg_porn = 0
+    avg_other = 0
+    for i, guess in enumerate(l1):
+        if l2[i] <= 0:
+            nb_other += 1
+            avg_other += guess
+            if guess < MARGIN:
+                score += 1
+        else:
+            nb_porn += 1
+            avg_porn += 1
+            if guess > MARGIN:
+                score += 1
+    return score / len(l1), (nb_porn, avg_porn / len(l1), nb_other, avg_other / len(l1))
 
 
 def train(loader, model, crit, optimizer, epoch, print_freq=100):
@@ -56,7 +75,7 @@ def train(loader, model, crit, optimizer, epoch, print_freq=100):
         optimizer.step()
         batch_time = time.time() - batch_time
         if i % print_freq == print_freq - 1 or i == (len(loader) - 1):
-            score = eval_recall(np.asarray(last_guesses), np.asarray(last_correct))
+            score, _ = eval_recall(np.asarray(last_guesses), np.asarray(last_correct))
             last_guesses, last_correct = [], []
             print(
                 "[",
@@ -78,6 +97,7 @@ def eval(loader, model, crit):
     model = model.eval()
     loss_avg = 0
     guess, correct = [], []
+
     for i, (inputs, lengths, labels) in enumerate(loader):
         print("%2.2f" % (i / len(loader) * 100), "\%", end="\r")
         with torch.no_grad():
@@ -95,19 +115,24 @@ def main():
 
     logger = SummaryWriter(os.path.join("./logs/", args.name))
     if args.model == "LSTM":
-        model = nn.DataParallel(models.FastTextLSTM()).train().cuda()
+        model = models.FastTextLSTM()
     elif args.model == "SUM":
-        model = nn.DataParallel(models.FastTextSum()).train().cuda()
+        model = models.FastTextSum()
+    elif args.model == "BertSum":
+        model = models.BertSumer(args.bert_model)
     elif args.model == "Bert":
-        model = nn.DataParallel(models.BertFinetuned().train().cuda())
+        model = models.BertPooler(args.bert_model)
+    else:
+        print("Unknown model to use :", args.model)
 
+    model = nn.DataParallel(model.train().cuda())
     print("Creating dataset", end="", flush=True)
     t = time.time()
 
-    if args.model == "Bert":
-        train_dataset = BertTextDataset(args.dataset_dir + "train.txt")
+    if "Bert" in args.model:
+        train_dataset = BertTextDataset(args.dataset_dir + "train.txt", args.bert_model)
         print("...", end="", flush=True)
-        val_dataset = BertTextDataset(args.dataset_dir + "test.txt")
+        val_dataset = BertTextDataset(args.dataset_dir + "test.txt", args.bert_model)
         print("Done in ", time.time() - t, "sec.", flush=True)
     else:
         train_dataset = FastTextDataset(
@@ -143,13 +168,18 @@ def main():
         collate_fn=coll,
         drop_last=False,
     )
-
-    criterium = nn.CrossEntropyLoss().cuda()
-    opti = optim.Adam(model.parameters(), lr=args.lr)
+    # criterium = nn.HingeEmbeddingLoss(margin=MARGIN).cuda()
+    criterium = nn.SoftMarginLoss().cuda()
+    if "Bert" in args.model:
+        opti = optim.Adam(model.module.model.pooler.parameters(), lr=args.lr)
+    else:
+        opti = optim.Adam(model.parameters(), lr=args.lr)
     print("First evaluation :")
-    loss_avg, best_rec = eval(val_loader, model, criterium)
+    loss_avg, (best_rec, nbs) = eval(val_loader, model, criterium)
     print("Avg loss : ", loss_avg)
     print("precision : ", best_rec)
+    print("Numbers : ", nbs)
+    best_rec = 0
 
     scheduler = optim.lr_scheduler.MultiStepLR(
         opti, milestones=args.lrd[1:], gamma=args.lrd[0]
@@ -159,14 +189,15 @@ def main():
         print("Train")
         train_loss = train(train_loader, model, criterium, opti, epoch)
         print("Validation")
-        loss, score = eval(val_loader, model, criterium)
+        loss, (score, nbs) = eval(val_loader, model, criterium)
         print("Score : ", score)
+        print("Numbers : ", nbs)
 
         if score > best_rec:
             print("saving best model")
             best_rec = score
             torch.save(model, "data/best_" + args.name + ".pth")
-        logger.add_scalar("Loss/loss", opti.param_groups[0]["lr"])
+        logger.add_scalar("Loss/loss", opti.param_groups[0]["lr"], epoch)
         logger.add_scalar("Loss/train", train_loss, epoch)
         logger.add_scalar("Loss/validation", loss, epoch)
         logger.add_scalar("Eval/validation", score, epoch)

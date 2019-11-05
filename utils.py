@@ -32,14 +32,14 @@ def split_train_text(queries):
     random.shuffle(porn)
     random.shuffle(other)
     print("Selection")
-    nb_fold = (len(porn) // 5) * 4
-    print("Nb train : ", nb_fold)
-    train = porn[:nb_fold]
-    train.extend(other[:nb_fold])
+    nb_fold = len(porn) // 5
+    print("Nb train : ", nb_fold * 4)
+    train = porn[: (nb_fold * 4)]
+    train.extend(other[: (nb_fold * 4)])
     print(len(train))
-    print("Nb val :", nb_fold / 4)
-    val = porn[nb_fold:]
-    val.extend(other[nb_fold : min(len(other), nb_fold)])
+    print("Nb val :", nb_fold)
+    val = porn[(nb_fold * 4) :]
+    val.extend(other[(nb_fold * 4) : len(porn)])
     print(len(val))
     print("Last shuffle")
     random.shuffle(train)
