@@ -35,14 +35,41 @@ def split_train_text(queries):
     nb_fold = len(porn) // 5
     print("Nb train : ", nb_fold * 4)
     train = porn[: (nb_fold * 4)]
-    train.extend(other[: (nb_fold * 4)])
+    train.extend(other[: (nb_fold * 4) * 3])
     print(len(train))
     print("Nb val :", nb_fold)
     val = porn[(nb_fold * 4) :]
     val.extend(other[(nb_fold * 4) : len(porn)])
     print(len(val))
+
+    print("Adding important queries")
+    important_dict = ["homme", "femme", "gay", "lesbienne"]
+    added_queries = []
+    for word in important_dict:
+        added_queries.extend(
+            [query for query in other if word in query and "__label__other" in query]
+        )
+    random.shuffle(added_queries)
+    print("Adding", len(added_queries), " queries")
+    train.extend(added_queries[:-100])
+    val.extend(added_queries[-100:])
+
     print("Last shuffle")
     random.shuffle(train)
     random.shuffle(val)
 
     return train, val
+
+
+if __name__ == "__main__":
+    lines = open(
+        "/data/datasets/porn/textual-data/queries/queries_with_femmeactuelle_senscritique_tetu.txt"
+    ).readlines()
+
+    train, val = split_train_text(lines)
+    fout = open("/data/datasets/porn/textual-data/queries/ext_train.txt", "w")
+    for e in train:
+        fout.write(e)
+    fout = open("/data/datasets/porn/textual-data/queries/ext_test.txt", "w")
+    for e in val:
+        fout.write(e)

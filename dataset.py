@@ -67,10 +67,12 @@ class FastTextDataset(GenericDataset):
 
 
 class BertTextDataset(GenericDataset):
-    def __init__(self, file, bert_model):
+    def __init__(self, file, bert_model, max_size=-1):
         self.data = []
         for line in open(file):
             label, sentence = line.split(" ", 1)
+            if max_size != -1:
+                sentence = sentence[:max_size]
             if len(sentence.split(" ")) > 20:
                 continue
             if (

@@ -48,7 +48,7 @@ def eval_recall(l1, l2):
                 score += 1
         else:
             nb_porn += 1
-            avg_porn += 1
+            avg_porn += guess
             if guess > MARGIN:
                 score += 1
     return score / len(l1), (nb_porn, avg_porn / len(l1), nb_other, avg_other / len(l1))
@@ -197,6 +197,16 @@ def main():
             print("saving best model")
             best_rec = score
             torch.save(model, "data/best_" + args.name + ".pth")
+
+        if "Bert" in args.model:
+            if epoch == 1:
+                opti.add_param_group(
+                    {"params": model.module.model.encoder.parameters(), "lr": args.lr}
+                )
+                scheduler = optim.lr_scheduler.MultiStepLR(
+                    opti, milestones=args.lrd[1:], gamma=args.lrd[0]
+                )
+
         logger.add_scalar("Loss/loss", opti.param_groups[0]["lr"], epoch)
         logger.add_scalar("Loss/train", train_loss, epoch)
         logger.add_scalar("Loss/validation", loss, epoch)
