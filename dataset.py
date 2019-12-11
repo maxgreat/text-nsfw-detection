@@ -69,10 +69,15 @@ class FastTextDataset(GenericDataset):
 class BertTextDataset(GenericDataset):
     def __init__(self, file, bert_model, max_size=-1):
         self.data = []
+        self.max_size = max_size
+        berttok = BertTokenizer.from_pretrained(bert_model)
+        self.getter = lambda x: (torch.LongTensor(berttok.encode(x[0])), x[1])
+
+    def add_data(self, file):
         for line in open(file):
             label, sentence = line.split(" ", 1)
-            if max_size != -1:
-                sentence = sentence[:max_size]
+            if self.max_size != -1:
+                sentence = sentence[: self.max_size]
             if len(sentence.split(" ")) > 20:
                 continue
             if (
@@ -84,5 +89,3 @@ class BertTextDataset(GenericDataset):
             else:
                 label = -1
             self.data.append((sentence, label))
-        berttok = BertTokenizer.from_pretrained(bert_model)
-        self.getter = lambda x: (torch.LongTensor(berttok.encode(x[0])), x[1])

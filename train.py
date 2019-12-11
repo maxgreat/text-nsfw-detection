@@ -29,8 +29,15 @@ def parse_args():
         "--lrd", default=[0.5, 2, 4, 6, 8], help="learning rate schedule"
     )
     parser.add_argument("--model", default="LSTM", help="LSTM or SUM or Bert")
-    parser.add_argument("--bert_model", default="bert-base-cased")
+    parser.add_argument("--bert_model", default="bert-base-multilingual-cased")
     parser.add_argument("--epochs", default=10, help="Numbers of epochs", type=int)
+    parser.add_argument(
+        "--extra_data",
+        default=[
+            "/data/datasets/porn/textual-data/wiki/wiki_Anatomie_Sexualité_et_sexologie_LGBT_WikiExtractor_text.jsonl"
+        ],
+    )
+
     return parser.parse_args()
 
 
@@ -131,7 +138,11 @@ def main():
 
     if "Bert" in args.model:
         train_dataset = BertTextDataset(args.dataset_dir + "train.txt", args.bert_model)
+        if len(args.extra_data) > 0:
+            for arg in args.extra_data:
+                train_dataset.add_data(arg)
         print("...", end="", flush=True)
+        print("train set :", len(train_dataset))
         val_dataset = BertTextDataset(args.dataset_dir + "test.txt", args.bert_model)
         print("Done in ", time.time() - t, "sec.", flush=True)
     else:
@@ -184,7 +195,7 @@ def main():
     scheduler = optim.lr_scheduler.MultiStepLR(
         opti, milestones=args.lrd[1:], gamma=args.lrd[0]
     )
-
+ 
     for epoch in range(args.epochs):
         print("Train")
         train_loss = train(train_loader, model, criterium, opti, epoch)

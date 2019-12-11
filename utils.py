@@ -1,4 +1,5 @@
 import random
+import json
 
 
 def split_train_text(queries):
@@ -61,7 +62,18 @@ def split_train_text(queries):
     return train, val
 
 
+def read_wiki_dump(wiki_file):
+    data = [json.loads(line)["text"] for line in wiki_file]
+    return data
+
+
+def write_safe(data):
+    for d in data:
+        print("__label__other " + d.replace("\n", " "))
+
+
 if __name__ == "__main__":
+    """
     lines = open(
         "/data/datasets/porn/textual-data/queries/queries_with_femmeactuelle_senscritique_tetu.txt"
     ).readlines()
@@ -73,3 +85,10 @@ if __name__ == "__main__":
     fout = open("/data/datasets/porn/textual-data/queries/ext_test.txt", "w")
     for e in val:
         fout.write(e)
+    """
+    data = read_wiki_dump(
+        open(
+            "/data/datasets/porn/textual-data/wiki/wiki_Anatomie_Sexualité_et_sexologie_LGBT_WikiExtractor_text.jsonl"
+        )
+    )
+    write_safe(data)

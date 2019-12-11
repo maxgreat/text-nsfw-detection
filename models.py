@@ -31,6 +31,7 @@ class FastTextLSTM(nn.Module):
         return self.classif(lasts).squeeze()
 
 
+
 class FastTextSum(nn.Module):
     def __init__(self):
         super(FastTextSum, self).__init__()
@@ -55,16 +56,21 @@ class BertSumer(nn.Module):
     """
         Sum content over buffer_size and pool the result
     """
+
     def __init__(self, bert_model, buffer_size=12):
         super(BertSumer, self).__init__()
         self.model = BertModel.from_pretrained(bert_model)
+        self.classif = nn.Linear(768, 1)
         self.buffer_size = buffer_size
 
     def forward(self, x, lengths):
         nb_cut = lengths // self.buffer_size
-        res = torch.zeros(x.shape[0], 768)
+        res = torch.zeros(x.shape[0], 768).cuda()
         if nb_cut > 0:
-            for i in range(nb_cut-1):
-                res += self.model(x[i*self.buffer_size : (i+1)*self.buffer_size])[1]
-        res += self.model(x[nb_cut*self.buffer_size:])[1]
-        return res
+            for i in range(nb_cut - 1):
+                res += self.model(x[i * self.buffer_size : (i + 1) * self.buffer_size])[
+                    1
+                ]
+        res += self.model(x[(nb_cut * self.buffer_size) :])[1]
+        res = self.classif(res)
+        return res.squeeze()
